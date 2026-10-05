@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recipe Keeper</title>
+<style>
+:root{--bg:#faf5ec;--ink:#2b2118;--card:#fff;--accent:#b4532a;--mut:#7a6a5a;--line:#e6dccb}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1712;--ink:#f3eadc;--card:#2a231b;--accent:#e08a5a;--mut:#b5a590;--line:#3d3328}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Georgia,'Times New Roman',serif}
+button,select,input,textarea{font:inherit;color:inherit}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:8px;padding:.6em 1.1em;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.5;cursor:wait}
+.hero{position:relative;min-height:60vh;display:flex;align-items:center;justify-content:center;text-align:center;color:#fff;overflow:hidden;background:linear-gradient(135deg,#7a3b1c,#c98a4b 60%,#e8c58f)}
+.hero .media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.hero::after{content:"";position:absolute;inset:0;background:rgba(20,10,0,.45)}
+.hero .in{position:relative;z-index:1;padding:2rem;max-width:720px}
+.hero h1{font-size:clamp(2rem,6vw,3.6rem);margin:.2em 0}
+.hero input.name{background:transparent;border:0;border-bottom:1px dashed #fff8;color:#fff;font-size:inherit;text-align:center;width:11ch;font-weight:bold}
+.hero .setbg{position:absolute;right:12px;bottom:12px;z-index:2;font-size:.8rem}
+main{max-width:980px;margin:0 auto;padding:2rem 1rem 4rem}
+section{margin-top:2.5rem}
+h2{margin:0 0 .6rem}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:1rem}
+textarea,input[type=text],select{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:.6em}
+textarea{min-height:170px;resize:vertical}
+.row{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-top:.7rem}
+.row>*{flex:0 0 auto}.grow{flex:1 1 200px!important}
+.dot{width:10px;height:10px;border-radius:50%;background:#c0392b;display:inline-block}
+.dot.ok{background:#2e9e5b}
+.muted{color:var(--mut);font-size:.9rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:1rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden;display:flex;flex-direction:column}
+.card .ph{height:160px;background:repeating-linear-gradient(45deg,var(--line),var(--line) 10px,transparent 10px,transparent 20px);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--mut);font-size:.85rem}
+.card .ph img{width:100%;height:100%;object-fit:cover}
+.card .b{padding:1rem;flex:1}
+.card h3{margin:.1em 0}
+.card ul,.card ol{padding-left:1.2rem;margin:.3rem 0}
+.quote{border-left:3px solid var(--accent);padding-left:.7rem;font-style:italic;color:var(--mut);font-size:.9rem;margin-top:.6rem}
+.card .act{display:flex;gap:.4rem;padding:0 1rem 1rem}
+.err{color:#c0392b;margin-top:.6rem}
+@media print{.hero .setbg,.noprint,#capture{display:none!important}.hero{min-height:30vh}.card{break-inside:avoid}.card .act{display:none}body{background:#fff;color:#000}}
+</style>
+</head>
+<body>
+<header class="hero" id="hero">
+  <div class="in">
+    <div class="muted" style="color:#fff9">A family cookbook, told in their own words</div>
+    <h1><input class="name" id="who" value="Grandpa" aria-label="Whose recipes"> 's Kitchen</h1>
+    <p>Paste what they said out loud. Keep the recipe <em>and</em> the story.</p>
+    <a href="#capture" class="btn noprint" style="text-decoration:none;display:inline-block">Add a recipe</a>
+  </div>
+  <label class="btn ghost setbg noprint" style="color:#fff;border-color:#fff8">Set background photo/video
+    <input type="file" id="bgfile" accept="image/*,video/*" hidden>
+  </label>
+</header>
+
+<main>
+<section id="capture" class="noprint">
+  <h2>1. What did they say?</h2>
+  <div class="panel">
+    <textarea id="memo" placeholder="Paste a transcript of the voice memo here. Rambling is welcome: 'so you take maybe a fistful of rice, no, more, and the onions, your grandmother always said...'"></textarea>
+    <div class="row">
+      <span><span class="dot" id="dot"></span> <span id="status" class="muted">checking Ollama…</span></span>
+      <select id="model" class="grow" aria-label="Model"></select>
+      <button class="btn ghost" id="refresh">Refresh models</button>
+    </div>
+    <div class="row">
+      <input type="text" id="host" class="grow" value="http://localhost:11434" aria-label="Ollama address">
+      <button class="btn" id="go">Turn into recipe</button>
+    </div>
+    <div id="live" class="muted" style="margin-top:.6rem;white-space:pre-wrap;max-height:90px;overflow:auto"></div>
+    <div id="err" class="err"></div>
+    <p class="muted">Tip: record with your phone, then transcribe offline with whisper.cpp, or type it out together. Nothing here is sent to the cloud.</p>
+  </div>
+</section>
+
+<section>
+  <h2>2. The cookbook</h2>
+  <div class="row noprint" style="margin:0 0 1rem">
+    <button class="btn ghost" id="print">Print / save as PDF</button>
+    <button class="btn ghost" id="export">Export backup (.json)</button>
+    <label class="btn ghost">Import backup<input type="file" id="import" accept=".json" hidden></label>
+  </div>
+  <div class="grid" id="book"></div>
+  <p class="muted" id="empty">No recipes yet. Your first one is a memo away.</p>
+</section>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const KEY='recipeKeeper.v1';
+let recipes=[];
+try{recipes=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(recipes))}catch(e){$('err').textContent='Storage is full. Export a backup and remove some photos.'}};
+try{$('who').value=localStorage.getItem('rk.who')||'Grandpa';$('host').value=localStorage.getItem('rk.host')||$('host').value}catch(e){}
+$('who').oninput=()=>{try{localStorage.setItem('rk.who',$('who').value)}catch(e){}};
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const arr=v=>Array.isArray(v)?v.map(String):(v?[String(v)]:[]);
+
+// Hero background (image or video). Kept in memory for the session.
+$('bgfile').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  document.querySelector('.hero .media')?.remove();
+  const url=URL.createObjectURL(f);
+  const el=document.createElement(f.type.startsWith('video')?'video':'img');
+  el.className='media';el.src=url;
+  if(el.tagName==='VIDEO'){el.autoplay=el.loop=el.muted=el.playsInline=true;}
+  $('hero').prepend(el);
+};
+
+// Ollama connection
+async function loadModels(){
+  const host=$('host').value.replace(/\/$/,'');
+  try{localStorage.setItem('rk.host',host)}catch(e){}
+  try{
+    const r=await fetch(host+'/api/tags');const j=await r.json();
+    const names=(j.models||[]).map(m=>m.name);
+    $('model').innerHTML=names.map(n=>`<option>${esc(n)}</option>`).join('');
+    const last=localStorage.getItem('rk.model');if(last&&names.includes(last))$('model').value=last;
+    $('dot').classList.toggle('ok',names.length>0);
+    $('status').textContent=names.length?`Ollama connected · ${names.length} model(s)`:'Ollama is running but has no models. Run: ollama pull llama3.2';
+  }catch(e){
+    $('dot').classList.remove('ok');
+    $('status').textContent='Cannot reach Ollama. Start it, and see setup note.';
+    $('model').innerHTML='';
+  }
+}
+$('refresh').onclick=loadModels;$('host').onchange=loadModels;
+$('model').onchange=()=>{try{localStorage.setItem('rk.model',$('model').value)}catch(e){}};
+
+const SYS=(who)=>`You turn a spoken, rambling recipe memory from ${who} into a clean recipe card.
+Rules: use ONLY what was said. Never invent exact quantities; if vague, keep their wording (e.g. "a fistful", "until it smells right"). Keep their personality in the intro.
+Reply with ONLY JSON in this shape:
+{"title":string,"intro":"one warm sentence","servings":string,"ingredients":[string],"steps":[string],"tips":[string]}
+If something is unclear, put it in tips as "Ask ${who}: ...".`;
+
+$('go').onclick=async()=>{
+  const text=$('memo').value.trim(),model=$('model').value,host=$('host').value.replace(/\/$/,'');
+  $('err').textContent='';
+  if(!text){$('err').textContent='Paste a memo first.';return}
+  if(!model){$('err').textContent='Pick a model (is Ollama running?).';return}
+  $('go').disabled=true;$('live').textContent='Listening closely…';
+  let out='';
+  try{
+    const r=await fetch(host+'/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model,stream:true,format:'json',options:{temperature:.2},
+        messages:[{role:'system',content:SYS($('who').value||'the cook')},{role:'user',content:text}]})});
+    if(!r.ok)throw new Error('Ollama said '+r.status+' '+await r.text());
+    const rd=r.body.getReader(),dec=new TextDecoder();let buf='';
+    while(true){
+      const {done,value}=await rd.read();if(done)break;
+      buf+=dec.decode(value,{stream:true});
+      const lines=buf.split('\n');buf=lines.pop();
+      for(const ln of lines){if(!ln.trim())continue;
+        try{const c=JSON.parse(ln);out+=c.message?.content||'';$('live').textContent=out.slice(-300)}catch(e){}}
+    }
+    const j=JSON.parse(out.replace(/^```json|```$/g,'').trim());
+    recipes.unshift({id:Date.now(),title:j.title||'Untitled recipe',intro:j.intro||'',servings:j.servings||'',
+      ingredients:arr(j.ingredients),steps:arr(j.steps),tips:arr(j.tips),original:text,photo:'',who:$('who').value,model});
+    save();render();$('memo').value='';$('live').textContent='Saved to the cookbook.';
+    document.getElementById('book').scrollIntoView({behavior:'smooth'});
+  }catch(e){
+    $('err').textContent='Something went wrong: '+e.message+(out?' (model output was not valid JSON; try again or use a larger model)':'');
+  }
+  $('go').disabled=false;
+};
+
+function render(){
+  $('empty').style.display=recipes.length?'none':'block';
+  $('book').innerHTML=recipes.map(r=>`
+  <article class="card" data-id="${r.id}">
+    <div class="ph" data-act="photo">${r.photo?`<img src="${r.photo}" alt="">`:'Click to add a photo of the dish'}</div>
+    <div class="b">
+      <h3>${esc(r.title)}</h3>
+      <div class="muted">${esc(r.who||'')}${r.servings?' · serves '+esc(r.servings):''}</div>
+      <p>${esc(r.intro)}</p>
+      <strong>Ingredients</strong><ul>${r.ingredients.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>
+      <strong>Steps</strong><ol>${r.steps.map(i=>`<li>${esc(i)}</li>`).join('')}</ol>
+      ${r.tips.length?`<strong>Notes</strong><ul>${r.tips.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:''}
+      <div class="quote">“${esc(r.original.length>280?r.original.slice(0,280)+'…':r.original)}”</div>
+    </div>
+    <div class="act"><button class="btn ghost" data-act="copy">Copy</button><button class="btn ghost" data-act="del">Delete</button></div>
+  </article>`).join('');
+}
+$('book').onclick=e=>{
+  const a=e.target.closest('[data-act]');if(!a)return;
+  const id=+a.closest('.card').dataset.id,r=recipes.find(x=>x.id===id);
+  if(a.dataset.act==='del'&&confirm('Delete this recipe?')){recipes=recipes.filter(x=>x.id!==id);save();render()}
+  if(a.dataset.act==='copy'){
+    const md=`# ${r.title}\n_${r.intro}_\n\n## Ingredients\n${r.ingredients.map(i=>'- '+i).join('\n')}\n\n## Steps\n${r.steps.map((s,i)=>(i+1)+'. '+s).join('\n')}\n\n> ${r.original}`;
+    navigator.clipboard.writeText(md).then(()=>{a.textContent='Copied!';setTimeout(()=>a.textContent='Copy',1200)});
+  }
+  if(a.dataset.act==='photo'){
+    const inp=document.createElement('input');inp.type='file';inp.accept='image/*';
+    inp.onchange=()=>{const f=inp.files[0];if(!f)return;const img=new Image();
+      img.onload=()=>{const c=document.createElement('canvas'),s=Math.min(1,600/img.width);
+        c.width=img.width*s;c.height=img.height*s;c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        r.photo=c.toDataURL('image/jpeg',.7);save();render()};
+      img.src=URL.createObjectURL(f)};
+    inp.click();
+  }
+};
+$('print').onclick=()=>window.print();
+$('export').onclick=()=>{
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(recipes)],{type:'application/json'}));
+  a.download='family-cookbook.json';a.click();
+};
+$('import').onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  f.text().then(t=>{try{const d=JSON.parse(t);if(!Array.isArray(d))throw 0;recipes=d.concat(recipes);save();render()}catch(_){$('err').textContent='That file is not a cookbook backup.'}});
+};
+render();loadModels();
+</script>
+</body>
+</html>
