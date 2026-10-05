@@ -1,4 +1,4 @@
-# 🍲 Recipe Keeper
+# Recipe Keeper
 
 Turn a loved one's rambling voice memos into a printable family cookbook, using an open-weight AI model that runs **entirely on your own computer**.
 
