@@ -2,7 +2,7 @@
 
 Turn a loved one's rambling voice memos into a printable family cookbook, using an open-weight AI model that runs **entirely on your own computer**.
 
-Built for **[name, e.g. my grandfather]** for the [Hacktoberfest Weekend Challenge: Build for a Friend](https://dev.to/challenges/hacktoberfest-weekend-2026-10-01).
+Built for **my grandfather** for the [Hacktoberfest Weekend Challenge: Build for a Friend](https://dev.to/challenges/hacktoberfest-weekend-2026-10-01).
 
 ![Recipe Keeper screenshot](screenshot.png)
 
